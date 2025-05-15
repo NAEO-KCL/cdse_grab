@@ -1,0 +1,5 @@
+pandas
+xarray
+fsspec
+pystac_client
+stackstac

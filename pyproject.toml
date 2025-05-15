@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cdse_grab"
+version = "0.1.0"
+description = "A Python package to grab data from CDS/E."
+authors = [
+    { name = "Jose Gomez-Dans", email = "jose.gomez-dans@kcl.ac.uk" }
+]
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+
+
+[project.urls]
+"Homepage" = "https://your-project-homepage.com"
+"Source" = "https://github.com/yourusername/cdse_grab"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 78
+target-version = "py312"
+src = ["src"]
+exclude = ["__pycache__", "build", "dist"]
+select = ["E", "F", "I"]  # pycodestyle, pyflakes, isort
+fix = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.ruff.lint]
+preview = true  # Enables unstable rules if desired
+
