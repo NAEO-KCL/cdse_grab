@@ -7,10 +7,12 @@ and NetCDF.
 
 from typing import Any, Iterator
 
+import fsspec
 import pandas as pd
 import pystac_client
 import stackstac
 import xarray as xr
+from tqdm.contrib.concurrent import thread_map
 
 from . import config  # type: ignore
 
@@ -107,7 +109,6 @@ class Sentinel3FRPLoader:
 
         # Create filesystem
         self.fs = config.create_fsspec_filesystem(self.creds)
-        self.load_all_assets()
 
     def stream_asset(
         self, item: dict[str, Any], asset_key: str
@@ -140,20 +141,60 @@ class Sentinel3FRPLoader:
                 record["item_id"] = item_id
                 yield record
 
-    def load_asset(self, asset_key: str) -> pd.DataFrame:
+    def load_asset(
+        self, asset_key: str, max_workers: int = 4
+    ) -> pd.DataFrame:
         """
-        Load a single asset across all items into a DataFrame.
+        Load a single asset across all items into a DataFrame in parallel.
 
         Parameters:
         - asset_key: Asset name to load (e.g., "FRP_an")
+        - max_workers: Number of threads to use
 
         Returns:
         - DataFrame of fire records
         """
-        records = []
-        for item in self.items:
-            records.extend(self.stream_asset(item, asset_key))
-        return pd.DataFrame(records)
+
+        def process_item(item: dict[str, Any]) -> list[dict[str, Any]]:
+            """Thread-safe per-item loader using its own filesystem
+            instance."""
+            time = pd.to_datetime(item["properties"]["datetime"])
+            item_id = item["id"]
+            url = item["assets"][asset_key]["href"]
+
+            # Create a new fs inside the thread
+            fs = fsspec.filesystem(
+                "s3",
+                anon=False,
+                client_kwargs={
+                    "endpoint_url": f"https://{self.creds['endpoint_url']}",
+                },
+            )
+
+            with fs.open(url) as f:
+                ds = xr.open_dataset(f)
+                fire_vars = [v for v in ds.data_vars if "fires" in ds[v].dims]
+                n_fires = ds.sizes.get("fires", 0)
+                return [
+                    {
+                        str(var): ds[var].isel(fires=i).item()
+                        for var in fire_vars
+                    }
+                    | {"acquisition_time": time, "item_id": item_id}
+                    for i in range(n_fires)
+                ]
+
+        # Run in parallel across all items
+        results: list[list[dict[str, Any]]] = thread_map(
+            process_item,
+            self.items,
+            max_workers=max_workers,
+            desc=f"Loading {asset_key}",
+        )
+
+        # Flatten the list of lists and convert to DataFrame
+        flat_records = [record for sublist in results for record in sublist]
+        return pd.DataFrame(flat_records)
 
     def load_all_assets(
         self, asset_keys: list[str] = ["FRP_an", "FRP_bn", "FRP_in"]
