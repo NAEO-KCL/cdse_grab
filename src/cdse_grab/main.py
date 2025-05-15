@@ -141,23 +141,8 @@ class Sentinel3FRPLoader:
                 record["item_id"] = item_id
                 yield record
 
-    # def load_asset(self, asset_key: str) -> pd.DataFrame:
-    #     """
-    #     Load a single asset across all items into a DataFrame.
-
-    #     Parameters:
-    #     - asset_key: Asset name to load (e.g., "FRP_an")
-
-    #     Returns:
-    #     - DataFrame of fire records
-    #     """
-    #     records = []
-    #     for item in self.items:
-    #         records.extend(self.stream_asset(item, asset_key))
-    #     return pd.DataFrame(records)
-
     def load_asset(
-        self, asset_key: str, max_workers: int = 8
+        self, asset_key: str, max_workers: int = 4
     ) -> pd.DataFrame:
         """
         Load a single asset across all items into a DataFrame in parallel.
