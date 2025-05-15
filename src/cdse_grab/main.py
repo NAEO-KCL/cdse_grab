@@ -107,6 +107,7 @@ class Sentinel3FRPLoader:
 
         # Create filesystem
         self.fs = config.create_fsspec_filesystem(self.creds)
+        self.load_all_assets()
 
     def stream_asset(
         self, item: dict[str, Any], asset_key: str
@@ -128,7 +129,7 @@ class Sentinel3FRPLoader:
         with self.fs.open(url) as f:
             ds = xr.open_dataset(f)
             fire_vars = [v for v in ds.data_vars if "fires" in ds[v].dims]
-            n_fires = ds.dims.get("fires", 0)
+            n_fires = ds.sizes.get("fires", 0)
 
             for i in range(n_fires):
                 record = {
@@ -154,7 +155,9 @@ class Sentinel3FRPLoader:
             records.extend(self.stream_asset(item, asset_key))
         return pd.DataFrame(records)
 
-    def load_all_assets(self, asset_keys: list[str]) -> pd.DataFrame:
+    def load_all_assets(
+        self, asset_keys: list[str] = ["FRP_an", "FRP_bn", "FRP_in"]
+    ) -> pd.DataFrame:
         """
         Load and merge multiple assets on the "fires" dimension.
         Currently performs an outer join on index.
